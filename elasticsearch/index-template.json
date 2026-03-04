@@ -1,0 +1,31 @@
+{
+  "index_patterns": ["pg-query-stats*"],
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0
+    },
+    "mappings": {
+      "properties": {
+        "@timestamp":      { "type": "date" },
+        "week_start":      { "type": "date", "format": "yyyy-MM-dd" },
+        "source":          { "type": "keyword" },
+        "source_label":    { "type": "keyword" },
+        "db_name":         { "type": "keyword" },
+        "query_hash":      { "type": "keyword" },
+        "query":           { "type": "text" },
+        "query_short": {
+          "type": "text",
+          "fields": {
+            "keyword": { "type": "keyword", "ignore_above": 256 }
+          }
+        },
+        "calls":           { "type": "long" },
+        "total_exec_time": { "type": "double" },
+        "mean_exec_time":  { "type": "double" },
+        "max_exec_time":   { "type": "double" },
+        "rows":            { "type": "long" }
+      }
+    }
+  }
+}

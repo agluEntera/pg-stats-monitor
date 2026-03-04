@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  collector:
+    build: ./collector
+    env_file: .env
+    restart: unless-stopped
+    # Позволяет контейнеру достучаться до PostgreSQL на хосте
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

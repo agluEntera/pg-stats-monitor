@@ -1,0 +1,15 @@
+ Быстрый старт
+
+  cd ~/pg-stats-monitor
+  cp .env.example .env
+  # заполнить .env
+
+  ./setup.sh                          # создаёт таблицу + поднимает Docker
+
+  # Проверить сборщик вручную (не ждать понедельника):
+  docker compose exec collector python collect.py
+
+  Доступ к Grafana
+
+  Grafana поднимается на порту 3000. Если нужен доступ снаружи — рекомендую Tailscale (установить на VM, тогда Grafana доступна по http://<tailscale-ip>:3000 без открытия портов).
+
