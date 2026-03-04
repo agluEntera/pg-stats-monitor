@@ -70,19 +70,30 @@ def make_es_client() -> Elasticsearch:
 
 
 def fetch_stats(cur, query_filter: str) -> list:
-    cur.execute("""
+    # total_exec_time/mean_exec_time/max_exec_time — PG 13+
+    # total_time/mean_time/max_time                — PG 9.6–12
+    cur.execute("SELECT current_setting('server_version_num')::int")
+    pg_version = cur.fetchone()[0]
+    if pg_version >= 130000:
+        time_cols = "total_exec_time, mean_exec_time, max_exec_time"
+        order_col = "mean_exec_time"
+    else:
+        time_cols = "total_time, mean_time, max_time"
+        order_col = "mean_time"
+
+    cur.execute(f"""
         SELECT
-            MD5(query)                  AS query_hash,
+            MD5(query) AS query_hash,
             query,
             calls,
-            total_exec_time / 1000.0    AS total_exec_time,
-            mean_exec_time  / 1000.0    AS mean_exec_time,
-            max_exec_time   / 1000.0    AS max_exec_time,
+            {time_cols.split(', ')[0]} / 1000.0 AS total_exec_time,
+            {time_cols.split(', ')[1]} / 1000.0 AS mean_exec_time,
+            {time_cols.split(', ')[2]} / 1000.0 AS max_exec_time,
             rows
         FROM pg_stat_statements
         WHERE query ILIKE %s
           AND calls > 0
-        ORDER BY mean_exec_time DESC
+        ORDER BY {order_col} DESC
     """, (query_filter,))
     return cur.fetchall()
 
