@@ -33,8 +33,8 @@ if KIBANA_USER:
     session.auth = HTTPBasicAuth(KIBANA_USER, KIBANA_PASS)
 
 
-def api(method: str, path: str, **kwargs):
-    url = f"{KIBANA_HOST}{path}"
+def api(method, path, **kwargs):
+    url = "{0}{1}".format(KIBANA_HOST, path)
     resp = session.request(method, url, **kwargs)
     if not resp.ok:
         log.error("HTTP %s %s → %s: %s", method, path, resp.status_code, resp.text[:300])
@@ -53,7 +53,7 @@ def apply_index_template():
     es_auth = (os.environ.get("ES_USER", ""), os.environ.get("ES_PASSWORD", ""))
 
     resp = requests.put(
-        f"{es_host}/_index_template/pg-query-stats-template",
+        "{0}/_index_template/pg-query-stats-template".format(es_host),
         json=template,
         auth=HTTPBasicAuth(*es_auth) if es_auth[0] else None,
         verify=False,
@@ -66,7 +66,7 @@ def apply_index_template():
 
 # ─── 2. Data View ─────────────────────────────────────────────────────────────
 
-def create_data_view() -> str:
+def create_data_view():
     """Создаёт Data View, возвращает его id."""
     # Проверяем, есть ли уже
     existing = api("GET", "/api/data_views")
@@ -89,7 +89,7 @@ def create_data_view() -> str:
 
 # ─── 3. Визуализации ──────────────────────────────────────────────────────────
 
-def _search_source(dv_id: str) -> str:
+def _search_source(dv_id):
     return json.dumps({
         "index": dv_id,
         "query": {"query_string": {"query": "*", "analyze_wildcard": True}},
@@ -97,7 +97,7 @@ def _search_source(dv_id: str) -> str:
     })
 
 
-def create_line_chart(dv_id: str) -> str:
+def create_line_chart(dv_id):
     """Mean Exec Time — тренд по неделям (top 10 запросов)."""
     vis_id = str(uuid.uuid4())
     vis_state = {
@@ -151,7 +151,7 @@ def create_line_chart(dv_id: str) -> str:
             },
         ],
     }
-    api("POST", f"/api/saved_objects/visualization/{vis_id}", json={
+    api("POST", "/api/saved_objects/visualization/{0}".format(vis_id), json={
         "attributes": {
             "title":    vis_state["title"],
             "visState": json.dumps(vis_state),
@@ -164,7 +164,7 @@ def create_line_chart(dv_id: str) -> str:
     return vis_id
 
 
-def create_bar_chart(dv_id: str) -> str:
+def create_bar_chart(dv_id):
     """Топ запросов по mean_exec_time (горизонтальный bar)."""
     vis_id = str(uuid.uuid4())
     vis_state = {
@@ -208,7 +208,7 @@ def create_bar_chart(dv_id: str) -> str:
             },
         ],
     }
-    api("POST", f"/api/saved_objects/visualization/{vis_id}", json={
+    api("POST", "/api/saved_objects/visualization/{0}".format(vis_id), json={
         "attributes": {
             "title":    vis_state["title"],
             "visState": json.dumps(vis_state),
@@ -221,7 +221,7 @@ def create_bar_chart(dv_id: str) -> str:
     return vis_id
 
 
-def create_data_table(dv_id: str) -> str:
+def create_data_table(dv_id):
     """Таблица: все запросы с метриками (по выбранному периоду)."""
     vis_id = str(uuid.uuid4())
     vis_state = {
@@ -262,7 +262,7 @@ def create_data_table(dv_id: str) -> str:
             },
         ],
     }
-    api("POST", f"/api/saved_objects/visualization/{vis_id}", json={
+    api("POST", "/api/saved_objects/visualization/{0}".format(vis_id), json={
         "attributes": {
             "title":    vis_state["title"],
             "visState": json.dumps(vis_state),
@@ -275,7 +275,7 @@ def create_data_table(dv_id: str) -> str:
     return vis_id
 
 
-def create_metric(dv_id: str) -> str:
+def create_metric(dv_id):
     """Метрика: количество уникальных запросов."""
     vis_id = str(uuid.uuid4())
     vis_state = {
@@ -308,7 +308,7 @@ def create_metric(dv_id: str) -> str:
             }
         ],
     }
-    api("POST", f"/api/saved_objects/visualization/{vis_id}", json={
+    api("POST", "/api/saved_objects/visualization/{0}".format(vis_id), json={
         "attributes": {
             "title":    vis_state["title"],
             "visState": json.dumps(vis_state),
@@ -323,30 +323,10 @@ def create_metric(dv_id: str) -> str:
 
 # ─── 4. Dashboard ─────────────────────────────────────────────────────────────
 
-def create_dashboard(line_id: str, bar_id: str, table_id: str, metric_id: str):
+def create_dashboard(line_id, bar_id, table_id, metric_id):
     dash_id = str(uuid.uuid4())
 
-    # Переменная $source — фильтр по БД прямо в дашборде
-    template_vars = [{
-        "current": {"selected": False, "text": "All", "value": ["$__all"]},
-        "hide": 0,
-        "includeAll": True,
-        "multi": True,
-        "label": "БД / источник",
-        "name": "source",
-        "options": [],
-        "query": "source:*",        # terms agg по полю source
-        "refresh": 2,               # обновлять при смене time range
-        "type": "query",
-        "useTags": False,
-        "tagsQuery": "",
-        "tagValuesQuery": "",
-        "sort": 1,
-        "datasource": {"type": "elasticsearch"},
-    }]
-
     panels = [
-        # Метрика (маленькая, сверху)
         {
             "panelIndex": "1",
             "gridData": {"x": 0, "y": 0, "w": 8, "h": 4, "i": "1"},
@@ -354,7 +334,6 @@ def create_dashboard(line_id: str, bar_id: str, table_id: str, metric_id: str):
             "type": "visualization",
             "id": metric_id,
         },
-        # Линейный тренд (широкий)
         {
             "panelIndex": "2",
             "gridData": {"x": 0, "y": 4, "w": 48, "h": 16, "i": "2"},
@@ -362,7 +341,6 @@ def create_dashboard(line_id: str, bar_id: str, table_id: str, metric_id: str):
             "type": "visualization",
             "id": line_id,
         },
-        # Горизонтальный бар
         {
             "panelIndex": "3",
             "gridData": {"x": 0, "y": 20, "w": 24, "h": 16, "i": "3"},
@@ -370,7 +348,6 @@ def create_dashboard(line_id: str, bar_id: str, table_id: str, metric_id: str):
             "type": "visualization",
             "id": bar_id,
         },
-        # Таблица
         {
             "panelIndex": "4",
             "gridData": {"x": 24, "y": 20, "w": 24, "h": 16, "i": "4"},
@@ -380,14 +357,13 @@ def create_dashboard(line_id: str, bar_id: str, table_id: str, metric_id: str):
         },
     ]
 
-    api("POST", f"/api/saved_objects/dashboard/{dash_id}", json={
+    api("POST", "/api/saved_objects/dashboard/{0}".format(dash_id), json={
         "attributes": {
             "title":           "PostgreSQL Query Stats",
             "description":     "Еженедельная статистика из pg_stat_statements",
             "panelsJSON":      json.dumps(panels),
             "optionsJSON":     json.dumps({"darkTheme": False, "hidePanelTitles": False, "useMargins": True}),
             "timeRestore":     False,
-            # KQL-запрос по умолчанию пустой; source фильтруется через переменную
             "kibanaSavedObjectMeta": {
                 "searchSourceJSON": json.dumps({
                     "query": {"language": "kuery", "query": ""},
@@ -407,7 +383,6 @@ def main():
     log.info("Kibana: %s", KIBANA_HOST)
     log.info("Индекс: %s", ES_INDEX)
 
-    # Проверяем соединение
     try:
         api("GET", "/api/status")
         log.info("Kibana доступна.")
@@ -416,10 +391,10 @@ def main():
         sys.exit(1)
 
     apply_index_template()
-    dv_id    = create_data_view()
-    line_id  = create_line_chart(dv_id)
-    bar_id   = create_bar_chart(dv_id)
-    table_id = create_data_table(dv_id)
+    dv_id     = create_data_view()
+    line_id   = create_line_chart(dv_id)
+    bar_id    = create_bar_chart(dv_id)
+    table_id  = create_data_table(dv_id)
     metric_id = create_metric(dv_id)
     create_dashboard(line_id, bar_id, table_id, metric_id)
 
